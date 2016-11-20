@@ -12,37 +12,60 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
 
   behavior of "ApacheCommonsFtp"
 
-  it should "run PWD" in {
-    execute(pwd).right.value mustBe "/home"
+  it must "run printWorkingDirectory" in {
+    execute(printWorkingDirectory).right.value mustBe "/home"
   }
 
-  it should "run NOOP" in {
+  it must "run noop" in {
     execute(noop).right.get mustBe 200
   }
 
-  it should "run CWD(existing dir)" in {
-    execute(cwd("/tmp")).right.value mustBe unit
+  it must "run changeWorkingDirectory(existing dir)" in {
+    execute(changeWorkingDirectory("/tmp")).right.value mustBe unit
   }
 
-  it should "run CWD(non-existing dir)" in {
-    execute(cwd("/non-existing")).left.value mustBe CommandError(NonExistingPath("/non-existing"))
+  it must "run changeWorkingDirectory(non-existing dir)" in {
+    execute(changeWorkingDirectory("/non-existing")).left.value mustBe CommandError(NonExistingPath("/non-existing"))
   }
 
-  it should "run CDUP" in {
-    execute(cwd("/tmp") followedBy cdup).right.value mustBe unit
+  it must "run changeToParentDirectory(child dir)" in {
+    execute(changeWorkingDirectory("/tmp") followedBy changeToParentDirectory).right.value mustBe unit
   }
 
-  it should "run CDUP(root dir)" in {
-    execute(cwd("/") followedBy cdup).left.value mustBe CommandError(NoParentDirectory)
+  it must "run changeToParentDirectory(root dir)" in {
+    execute(changeWorkingDirectory("/") followedBy changeToParentDirectory).left.value mustBe CommandError(NoParentDirectory)
   }
 
-  it should "run RETR" in {
-    val is = execute(retr("/tmp/file1.txt")).right.value
+  it must "run retrieveFileStream(existing file)" in {
+    val is = execute(retrieveFileStream("/tmp/file1.txt")).right.value
     scala.io.Source.fromInputStream(is).getLines().mkString("\n") mustBe "abcdef\n1234567890"
   }
 
-  it should "run RETR(non-existing file)" in {
-    execute(retr("/foo")).left.value mustBe CommandError(UnknownError("550 [/foo] does not exist."))
+  it must "run retrieveFileStream(non-existing file)" in {
+    execute(retrieveFileStream("/foo")).left.value mustBe CommandError(GenericError(550, "550 [/foo] does not exist."))
+  }
+
+  it must "run listDirectories(existing path)" in {
+    execute(listDirectories("/")).right.value.map(f => (f.name, f.size, f.group, f.user)) must contain allOf (
+      ("tmp", 0, "none", "none"),
+      ("home", 0, "none", "none")
+    )
+  }
+
+  it must "run listDirectories(non-existing path)" in {
+    execute(listDirectories("/foo")).right.value mustBe empty
+  }
+
+  it must "run listDirectories(file path)" in {
+    execute(listDirectories("/tmp/file1.txt")).right.value mustBe empty
+  }
+
+  it must "run listNames(existing path)" in {
+    execute(listNames("/")).right.value must contain allOf ("tmp", "home")
+  }
+
+  it must "run listNames(non-existing path)" in {
+    execute(listNames("/foo")).right.value mustBe empty
   }
 
   def execute[A](command: FtpCommand[FtpCommandError Either A]): Either[FtpError, A] =

@@ -25,6 +25,7 @@ object Ftpee {
   case class ConnectionClosedError(message: String) extends FtpCommandError
   case class IoError(message: String) extends FtpCommandError
   case class UnknownError(message: String) extends FtpCommandError
+  case class GenericError(code: Int, message: String) extends FtpCommandError
   case class NonExistingPath(path: String) extends FtpCommandError
   object NoParentDirectory extends FtpCommandError
   object CantObtainCurrentDirectory extends FtpCommandError
@@ -32,19 +33,33 @@ object Ftpee {
   type FtpCommand[A] = Free[FtpCommandA, A]
 
   sealed trait FtpCommandA[A]
-  object NOOP extends FtpCommandA[Either[FtpCommandError, Int]]
-  object PWD extends FtpCommandA[Either[FtpCommandError, String]]
-  object CDUP extends FtpCommandA[Either[FtpCommandError, Unit]]
-  case class CWD(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
-  case class RETR(remote: String) extends FtpCommandA[Either[FtpCommandError, InputStream]]
-  case class LIST(parent: String) extends FtpCommandA[Either[FtpCommandError, List[RemoteFile]]]
-  case class NLST(name: String) extends FtpCommandA[Either[FtpCommandError, List[String]]]
+  object Noop extends FtpCommandA[Either[FtpCommandError, Int]]
+  object PrintWorkingDirectory extends FtpCommandA[Either[FtpCommandError, String]]
+  object ChangeToParentDirectory extends FtpCommandA[Either[FtpCommandError, Unit]]
+  case class ChangeWorkingDirectory(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
+  case class RetrieveFileStream(remote: String) extends FtpCommandA[Either[FtpCommandError, InputStream]]
+  case class ListDirectories(parent: String) extends FtpCommandA[Either[FtpCommandError, List[RemoteFile]]]
+  case class ListNames(name: String) extends FtpCommandA[Either[FtpCommandError, List[String]]]
 
-  def noop: FtpCommand[Either[FtpCommandError, Int]] = liftF(NOOP)
-  def pwd: FtpCommand[Either[FtpCommandError, String]] = liftF(PWD)
-  def cdup: FtpCommand[Either[FtpCommandError, Unit]] = liftF(CDUP)
-  def cwd(name: String): FtpCommand[Either[FtpCommandError, Unit]] = liftF(CWD(name))
-  def retr(name: String): FtpCommand[Either[FtpCommandError, InputStream]] = liftF(RETR(name))
-  def list(name: String): FtpCommand[Either[FtpCommandError, List[RemoteFile]]] = liftF(LIST(name))
-  def nlst(name: String): FtpCommand[Either[FtpCommandError, List[String]]] = liftF(NLST(name))
+
+  def noop: FtpCommand[Either[FtpCommandError, Int]] =
+    liftF(Noop)
+
+  def printWorkingDirectory: FtpCommand[Either[FtpCommandError, String]] =
+    liftF(PrintWorkingDirectory)
+
+  def changeToParentDirectory: FtpCommand[Either[FtpCommandError, Unit]] =
+    liftF(ChangeToParentDirectory)
+
+  def changeWorkingDirectory(name: String): FtpCommand[Either[FtpCommandError, Unit]] =
+    liftF(ChangeWorkingDirectory(name))
+
+  def retrieveFileStream(name: String): FtpCommand[Either[FtpCommandError, InputStream]] =
+    liftF(RetrieveFileStream(name))
+
+  def listDirectories(name: String): FtpCommand[Either[FtpCommandError, List[RemoteFile]]] =
+    liftF(ListDirectories(name))
+
+  def listNames(name: String): FtpCommand[Either[FtpCommandError, List[String]]] =
+    liftF(ListNames(name))
 }

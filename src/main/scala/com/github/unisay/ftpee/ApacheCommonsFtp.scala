@@ -53,10 +53,10 @@ object ApacheCommonsFtp extends ThrowableInstances {
         implicit def kToA[T](cmd: Cmd[T]): Kleisli[I, FTPClient, A] = cmd.map(_.asInstanceOf[A])
 
         ftpCommand match {
-          case NOOP =>
+          case Noop =>
             useClient(_.noop()).value
 
-          case CDUP =>
+          case ChangeToParentDirectory =>
             useClient(_.changeToParentDirectory())
               .transform {
                 case Right(false) => Left(NoParentDirectory)
@@ -65,12 +65,12 @@ object ApacheCommonsFtp extends ThrowableInstances {
               }
               .value
 
-          case PWD =>
+          case PrintWorkingDirectory =>
             useClient(client => Option(client.printWorkingDirectory()))
               .subflatMap(_.toRight[FtpCommandError](CantObtainCurrentDirectory))
               .value
 
-          case CWD(pathName) =>
+          case ChangeWorkingDirectory(pathName) =>
             useClient(_.changeWorkingDirectory(pathName))
               .transform {
                 case Right(false) => Left(NonExistingPath(pathName))
@@ -79,21 +79,21 @@ object ApacheCommonsFtp extends ThrowableInstances {
               }
               .value
 
-          case RETR(remote) =>
+          case RetrieveFileStream(remote) =>
             useClient(client => Option(client.retrieveFileStream(remote)))
               .flatMapF[InputStream] {
-                case None => useClient(_.getReplyString.trim).transform {
-                  case Right(message) => Left(UnknownError(message))
+                case None => useClient(client => client.getReplyCode -> client.getReplyString.trim).transform {
+                  case Right((code, message)) => Left(GenericError(code, message))
                   case other => other
                 }.value
                 case Some(inputStream) => Kleisli.pure(Right(inputStream))
               }
               .value
 
-          case LIST(parent) =>
+          case ListDirectories(parent) =>
             useClient(_.listDirectories(parent).map(asRemoteFile).toList).value
 
-          case NLST(pathName) =>
+          case ListNames(pathName) =>
             useClient(_.listNames(pathName).toList).value
         }
       }
