@@ -17,7 +17,11 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
   }
 
   it must "run noop" in {
-    execute(noop).right.get mustBe 200
+    execute(noop).right.value mustBe 200
+  }
+
+  it must "enter local passive mode" in {
+    ApacheCommonsFtp.runSession(clientConfig, enterLocalPassiveMode).value.right.value mustBe unit
   }
 
   it must "run changeWorkingDirectory(existing dir)" in {
@@ -25,7 +29,23 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
   }
 
   it must "run changeWorkingDirectory(non-existing dir)" in {
-    execute(changeWorkingDirectory("/non-existing")).left.value mustBe CommandError(NonExistingPath("/non-existing"))
+    execute(changeWorkingDirectory("/non-existing")).left.value mustBe NonExistingPath("/non-existing")
+  }
+
+  it must "run makeDirectory(non-existing dir)" in {
+    execute(makeDirectory("/newdir")).right.value mustBe unit
+  }
+
+  it must "run makeDirectory(existing dir)" in {
+    execute(makeDirectory("/tmp")).left.value mustBe GenericError(550, "550 The path [/tmp] already exists.")
+  }  
+
+  it must "run deleteFile(existing file)" in {
+    execute(deleteFile("/tmp/file2.txt")).right.value mustBe unit
+  }
+
+  it must "run deleteFile(non-existing file)" in {
+    execute(deleteFile("/non-existing")).left.value mustBe NonExistingPath("/non-existing")
   }
 
   it must "run changeToParentDirectory(child dir)" in {
@@ -33,7 +53,7 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
   }
 
   it must "run changeToParentDirectory(root dir)" in {
-    execute(changeWorkingDirectory("/") followedBy changeToParentDirectory).left.value mustBe CommandError(NoParentDirectory)
+    execute(changeWorkingDirectory("/") followedBy changeToParentDirectory).left.value mustBe NoParentDirectory
   }
 
   it must "run retrieveFileStream(existing file)" in {
@@ -42,14 +62,12 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
   }
 
   it must "run retrieveFileStream(non-existing file)" in {
-    execute(retrieveFileStream("/foo")).left.value mustBe CommandError(GenericError(550, "550 [/foo] does not exist."))
+    execute(retrieveFileStream("/foo")).left.value mustBe GenericError(550, "550 [/foo] does not exist.")
   }
 
   it must "run listDirectories(existing path)" in {
-    execute(listDirectories("/")).right.value.map(f => (f.name, f.size, f.group, f.user)) must contain allOf (
-      ("tmp", 0, "none", "none"),
-      ("home", 0, "none", "none")
-    )
+    execute(listDirectories("/")).right.value.map(f => (f.name, f.size, f.group, f.user)) must contain
+      allOf (("tmp", 0, "none", "none"), ("home", 0, "none", "none"))
   }
 
   it must "run listDirectories(non-existing path)" in {
@@ -68,8 +86,8 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
     execute(listNames("/foo")).right.value mustBe empty
   }
 
-  def execute[A](command: FtpCommand[FtpCommandError Either A]): Either[FtpError, A] =
-    ApacheCommonsFtp.runSession(clientConfig, command).value
+  def execute[A](command: FtpCommand[FtpCommandError Either A]): FtpCommandError Either A =
+    ApacheCommonsFtp.runSession(clientConfig, command).value.right.value
 
   def clientConfig = FtpClientConfig(
     host = "localhost",
@@ -88,6 +106,7 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
     fileSystem.add(new DirectoryEntry("/home"))
     fileSystem.add(new DirectoryEntry("/tmp"))
     fileSystem.add(new FileEntry("/tmp/file1.txt", "abcdef\n1234567890"))
+    fileSystem.add(new FileEntry("/tmp/file2.txt", "delete me"))
     fakeFtpServer.setFileSystem(fileSystem)
     fakeFtpServer.setServerControlPort(0)
     fakeFtpServer.start()

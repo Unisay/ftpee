@@ -19,7 +19,6 @@ object Ftpee {
   sealed trait FtpError
   case class ConnectionError(message: String) extends FtpError
   case class DisconnectionError(message: String) extends FtpError
-  case class CommandError(cause: FtpCommandError) extends FtpError
 
   sealed trait FtpCommandError
   case class ConnectionClosedError(message: String) extends FtpCommandError
@@ -33,14 +32,24 @@ object Ftpee {
   type FtpCommand[A] = Free[FtpCommandA, A]
 
   sealed trait FtpCommandA[A]
+  object EnterLocalPassiveMode extends FtpCommandA[Unit]
+  object EnterLocalActiveMode extends FtpCommandA[Unit]
   object Noop extends FtpCommandA[Either[FtpCommandError, Int]]
   object PrintWorkingDirectory extends FtpCommandA[Either[FtpCommandError, String]]
   object ChangeToParentDirectory extends FtpCommandA[Either[FtpCommandError, Unit]]
   case class ChangeWorkingDirectory(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
+  case class MakeDirectory(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
+  case class DeleteFile(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
   case class RetrieveFileStream(remote: String) extends FtpCommandA[Either[FtpCommandError, InputStream]]
   case class ListDirectories(parent: String) extends FtpCommandA[Either[FtpCommandError, List[RemoteFile]]]
   case class ListNames(name: String) extends FtpCommandA[Either[FtpCommandError, List[String]]]
 
+
+  def enterLocalPassiveMode: FtpCommand[Unit] =
+    liftF(EnterLocalPassiveMode)
+
+  def enterLocalActiveMode: FtpCommand[Unit] =
+    liftF(EnterLocalActiveMode)
 
   def noop: FtpCommand[Either[FtpCommandError, Int]] =
     liftF(Noop)
@@ -50,6 +59,12 @@ object Ftpee {
 
   def changeToParentDirectory: FtpCommand[Either[FtpCommandError, Unit]] =
     liftF(ChangeToParentDirectory)
+
+  def makeDirectory(pathName: String): FtpCommand[Either[FtpCommandError, Unit]] =
+    liftF(MakeDirectory(pathName))
+
+  def deleteFile(pathName: String): FtpCommand[Either[FtpCommandError, Unit]] =
+    liftF(DeleteFile(pathName))
 
   def changeWorkingDirectory(name: String): FtpCommand[Either[FtpCommandError, Unit]] =
     liftF(ChangeWorkingDirectory(name))

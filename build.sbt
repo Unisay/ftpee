@@ -8,7 +8,6 @@ val slf4jVersion = "1.7.21"
 val catsVersion = "0.8.1"
 val commonsNetVersion = "3.5"
 val scalatestVersion = "3.0.0"
-val monixVersion = "2.1.0"
 val mockFtpServerVersion = "2.7"
 
 libraryDependencies += "org.slf4j" % "slf4j-api" % slf4jVersion

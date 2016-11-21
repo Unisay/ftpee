@@ -31,12 +31,16 @@ At the moment **FTPee** implements:
 
 | FTP Command | FTPee Command |
 |-------------|---------------|
-| NOOP | `Ftpee.noop` |
-| PWD  | `Ftpee.printWorkingDirectory` |
-| CDUP | `Ftpee.changeToParentDirectory` |
-| CWD  | `Ftpee.changeWorkingDirectory` |
-| RETR | `Ftpee.retrieveFileStream` |
-| LIST | `Ftpee.listDirectories` |
-| NLST | `Ftpee.listNames` |
+| NOOP | `noop` |
+| PASV | `enterLocalPassiveMode` |
+| _default_ | `enterLocalActiveMode` |
+| PWD  | `printWorkingDirectory` |
+| CDUP | `changeToParentDirectory` |
+| CWD  | `changeWorkingDirectory` |
+| MKD  | `makeDirectory` |
+| DELE | `deleteFile` |
+| RETR | `retrieveFileStream` |
+| LIST | `listDirectories` |
+| NLST | `listNames` |
 
 - An interpreter backed by Apache Commons `FTPClient`

@@ -12,12 +12,11 @@ import scala.language.{higherKinds, implicitConversions}
 
 object ApacheCommonsFtp extends ThrowableInstances {
 
-  def runSession[I[_] : IO : Monad, A](clientConfig: FtpClientConfig,
-                                       command: FtpCommand[FtpCommandError Either A]): I[FtpError Either A] =
+  def runSession[I[_] : IO : Monad, A](config: FtpClientConfig, cmd: FtpCommand[A]): I[FtpError Either A] =
     (
       for {
-        client <- EitherT(connectClient(clientConfig)).leftMap(e => e : FtpError)
-        result <- EitherT(runCommand(client, command)).leftMap(CommandError(_): FtpError)
+        client <- EitherT(connectClient(config)).leftMap(e => e : FtpError)
+        result <- EitherT(cmd.foldMap[Kleisli[I, FTPClient, ?]](compiler).run(client).map(Either.right[FtpError, A]))
         _ <- EitherT(disconnectClient(client)).leftMap(e => e : FtpError)
       } yield result
     ).value
@@ -42,6 +41,13 @@ object ApacheCommonsFtp extends ThrowableInstances {
               }
             }
           )
+
+        def getGenericError[T]: Res[Either[FtpCommandError, T]] =
+          useClient(client => client.getReplyCode -> client.getReplyString.trim)
+            .transform {
+              case Right((code, message)) => Left(GenericError(code, message): FtpCommandError)
+              case _ => sys.error("Failed to retrieve error code")
+            }.value
 
         def asRemoteFile(file: FTPFile): RemoteFile = new RemoteFile {
           def name: String = file.getName
@@ -82,11 +88,31 @@ object ApacheCommonsFtp extends ThrowableInstances {
           case RetrieveFileStream(remote) =>
             useClient(client => Option(client.retrieveFileStream(remote)))
               .flatMapF[InputStream] {
-                case None => useClient(client => client.getReplyCode -> client.getReplyString.trim).transform {
-                  case Right((code, message)) => Left(GenericError(code, message))
-                  case other => other
-                }.value
+                case None => getGenericError[InputStream]
                 case Some(inputStream) => Kleisli.pure(Right(inputStream))
+              }
+              .value
+
+          case EnterLocalPassiveMode =>
+            Kleisli(client => io.delay(client.enterLocalPassiveMode()))
+
+          case EnterLocalActiveMode =>
+            Kleisli(client => io.delay(client.enterLocalActiveMode()))
+
+          case DeleteFile(pathName) =>
+            useClient(_.deleteFile(pathName))
+              .transform {
+                case Right(false) => Left(NonExistingPath(pathName))
+                case Right(true) => Right(())
+                case other => other
+              }
+              .value
+
+          case MakeDirectory(pathName) =>
+            useClient(_.makeDirectory(pathName))
+              .flatMapF {
+                case false => getGenericError[Unit]
+                case true => Kleisli.pure(Either.right[FtpCommandError, Unit](()))
               }
               .value
 
@@ -109,11 +135,6 @@ object ApacheCommonsFtp extends ThrowableInstances {
         client
       } leftMap { case e: IOException => ConnectionError(Show[Throwable].show(e)) }
     }
-
-  private def runCommand[I[_] : IO : Monad, A](
-    client: FTPClient,
-    cmd: FtpCommand[FtpCommandError Either A]
-  ): I[Either[FtpCommandError, A]] = cmd.foldMap[Kleisli[I, FTPClient, ?]](compiler).run(client)
 
   private def disconnectClient[I[_]: IO](client: FTPClient): I[DisconnectionError Either Unit] =
     implicitly[IO[I]].delay {
