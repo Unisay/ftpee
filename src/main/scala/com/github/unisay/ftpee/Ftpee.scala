@@ -29,20 +29,20 @@ object Ftpee {
   object NoParentDirectory extends FtpCommandError
   object CantObtainCurrentDirectory extends FtpCommandError
 
-  type FtpCommand[A] = Free[FtpCommandA, A]
+  type FtpCommand[A] = Free[FtpCommandF, A]
 
-  sealed trait FtpCommandA[A]
-  object EnterLocalPassiveMode extends FtpCommandA[Unit]
-  object EnterLocalActiveMode extends FtpCommandA[Unit]
-  object Noop extends FtpCommandA[Either[FtpCommandError, Int]]
-  object PrintWorkingDirectory extends FtpCommandA[Either[FtpCommandError, String]]
-  object ChangeToParentDirectory extends FtpCommandA[Either[FtpCommandError, Unit]]
-  case class ChangeWorkingDirectory(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
-  case class MakeDirectory(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
-  case class DeleteFile(pathName: String) extends FtpCommandA[Either[FtpCommandError, Unit]]
-  case class RetrieveFileStream(remote: String) extends FtpCommandA[Either[FtpCommandError, InputStream]]
-  case class ListDirectories(parent: String) extends FtpCommandA[Either[FtpCommandError, List[RemoteFile]]]
-  case class ListNames(name: String) extends FtpCommandA[Either[FtpCommandError, List[String]]]
+  sealed trait FtpCommandF[A]
+  object EnterLocalPassiveMode extends FtpCommandF[Unit]
+  object EnterLocalActiveMode extends FtpCommandF[Unit]
+  object Noop extends FtpCommandF[Either[FtpCommandError, Int]]
+  object PrintWorkingDirectory extends FtpCommandF[Either[FtpCommandError, String]]
+  object ChangeToParentDirectory extends FtpCommandF[Either[FtpCommandError, Unit]]
+  case class ChangeWorkingDirectory(pathName: String) extends FtpCommandF[Either[FtpCommandError, Unit]]
+  case class MakeDirectory(pathName: String) extends FtpCommandF[Either[FtpCommandError, Unit]]
+  case class DeleteFile(pathName: String) extends FtpCommandF[Either[FtpCommandError, Unit]]
+  case class RetrieveFileStream(remote: String) extends FtpCommandF[Either[FtpCommandError, InputStream]]
+  case class ListDirectories(parent: String) extends FtpCommandF[Either[FtpCommandError, List[RemoteFile]]]
+  case class ListNames(name: String) extends FtpCommandF[Either[FtpCommandError, List[String]]]
 
 
   def enterLocalPassiveMode: FtpCommand[Unit] =

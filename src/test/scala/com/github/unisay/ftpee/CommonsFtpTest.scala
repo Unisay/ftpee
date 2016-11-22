@@ -1,16 +1,14 @@
 package com.github.unisay.ftpee
 
-import cats.Eval._
 import cats.implicits._
 import com.github.unisay.ftpee.Ftpee._
-import com.github.unisay.ftpee.IOInstances.ioEval
 import org.mockftpserver.fake.filesystem.{DirectoryEntry, FileEntry, UnixFakeFileSystem}
 import org.mockftpserver.fake.{FakeFtpServer, UserAccount}
 import org.scalatest.{BeforeAndAfterAll, EitherValues, FlatSpec, MustMatchers}
 
-class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues with BeforeAndAfterAll {
+class CommonsFtpTest extends FlatSpec with MustMatchers with EitherValues with BeforeAndAfterAll {
 
-  behavior of "ApacheCommonsFtp"
+  behavior of "CommonsFtp"
 
   it must "run printWorkingDirectory" in {
     execute(printWorkingDirectory).right.value mustBe "/home"
@@ -21,7 +19,7 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
   }
 
   it must "enter local passive mode" in {
-    ApacheCommonsFtp.runSession(clientConfig, enterLocalPassiveMode).value.right.value mustBe unit
+    CommonsFtp.runSession(clientConfig, enterLocalPassiveMode).value.right.value mustBe unit
   }
 
   it must "run changeWorkingDirectory(existing dir)" in {
@@ -87,7 +85,7 @@ class ApacheCommonsFtpTest extends FlatSpec with MustMatchers with EitherValues 
   }
 
   def execute[A](command: FtpCommand[FtpCommandError Either A]): FtpCommandError Either A =
-    ApacheCommonsFtp.runSession(clientConfig, command).value.right.value
+    CommonsFtp.runSession(clientConfig, command).value.right.value
 
   def clientConfig = FtpClientConfig(
     host = "localhost",
