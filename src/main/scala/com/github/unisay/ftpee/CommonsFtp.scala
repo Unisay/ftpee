@@ -5,7 +5,6 @@ import java.io.{IOException, InputStream}
 import cats._
 import cats.data.{EitherT, Kleisli}
 import cats.implicits._
-import com.github.unisay.ftpee.CommonsFtp.FtpSessionF.RunSession
 import com.github.unisay.ftpee.Ftpee._
 import org.apache.commons.net.ftp.{FTPClient, FTPConnectionClosedException, FTPFile}
 
@@ -16,13 +15,8 @@ object CommonsFtp extends ThrowableInstances {
   type FtpActionF[A] = Kleisli[Eval, FTPClient, A]
   type FtpActionE[A] = FtpActionF[Either[FtpCommandError, A]]
 
-  sealed trait FtpSessionF[A]
-  object FtpSessionF {
-    case class RunSession[A](action: FtpActionF[A]) extends FtpSessionF[A]
-  }
-
   def runSession[A](config: FtpClientConfig, command: FtpCommand[A]): Eval[Either[FtpError, A]] =
-    sessionToEval(config)(actionToSession(command.foldMap(ftpToAction))).value
+    actionToEval(config, command.foldMap(ftpToAction)).value
 
   private val ftpToAction = new (FtpCommandF ~> FtpActionF) {
     def apply[A](ftpCommand: FtpCommandF[A]): FtpActionF[A] = {
@@ -124,18 +118,18 @@ object CommonsFtp extends ThrowableInstances {
     }
   }
 
-  private val actionToSession = new (FtpActionF ~> FtpSessionF) {
-    def apply[A](fa: FtpActionF[A]): FtpSessionF[A] = RunSession(fa)
-  }
+  private def actionToEval[A](config: FtpClientConfig, action: FtpActionF[A]): EitherT[Eval, FtpError, A] =
+    for {
+      client <- connect(config)
+      result <- runAction(client, action)
+      _ <- disconnect(client)
+    } yield result
 
-  private def sessionToEval(config: FtpClientConfig) = new (FtpSessionF ~> EitherT[Eval, FtpError, ?]) {
-    def apply[A](session: FtpSessionF[A]): EitherT[Eval, FtpError, A] =
-      for {
-        client <- EitherT(connectClient(config)).leftMap(e => e : FtpError)
-        result <- EitherT(session.asInstanceOf[RunSession[A]].action.run(client).map(Either.right[FtpError, A]))
-        _ <- EitherT(disconnectClient(client)).leftMap(e => e : FtpError)
-      } yield result
-  }
+  private def runAction[A](client: FTPClient, action: FtpActionF[A]): EitherT[Eval, FtpError, A] =
+    EitherT(action.run(client).map(Either.right[FtpError, A]))
+
+  private def connect[A](config: FtpClientConfig): EitherT[Eval, FtpError, FTPClient] =
+    EitherT(connectClient(config)).leftMap(e => e: FtpError)
 
   private def connectClient(clientConfig: FtpClientConfig): Eval[ConnectionError Either FTPClient] =
     Eval.later {
@@ -146,6 +140,9 @@ object CommonsFtp extends ThrowableInstances {
         client
       } leftMap { case e: IOException => ConnectionError(Show[Throwable].show(e)) }
     }
+
+  private def disconnect[A](client: FTPClient): EitherT[Eval, FtpError, Unit] =
+    EitherT(disconnectClient(client)).leftMap(e => e: FtpError)
 
   private def disconnectClient(client: FTPClient): Eval[DisconnectionError Either Unit] =
     Eval.later {

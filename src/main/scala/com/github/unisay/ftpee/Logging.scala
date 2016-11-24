@@ -15,14 +15,13 @@ object Logging {
     def log(string: String): Free[LoggingF, Unit] = Free.liftF(Log(string))
   }
 
-  def exec[I[_]: Monad](implicit io: IO[I]) =
-    new (LoggingF ~> I) {
-      override def apply[A](fa: LoggingF[A]): I[A] = fa match {
-        case Log(line) => io.delay(println())
+  val loggingToEval = new (LoggingF ~> Eval) {
+      override def apply[A](fa: LoggingF[A]): Eval[A] = fa match {
+        case Log(line) => Eval.later(println(line))
       }
     }
 
-  val ftpLogging: FtpCommandF ~< Halt[LoggingF, ?] = new (FtpCommandF ~< Halt[LoggingF, ?]) {
+  val commandToLogging = new (FtpCommandF ~< Halt[LoggingF, ?]) {
       override def apply[A](fa: FtpCommandF[A]): Free[Halt[LoggingF, ?], A] = {
         def log(string: String): Free[Halt[LoggingF, ?], A] = Free.liftF[Halt[LoggingF, ?], A](LoggingF.Log(string))
         fa match {
